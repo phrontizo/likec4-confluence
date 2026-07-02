@@ -199,7 +199,7 @@ echo "plugin /source  = $(curl -s -u "$CONF_AUTH" "${CONF_BASE}/rest/likec4/1.0/
 # discipline in perf/run.sh and zero-git-render.sh.
 SPEC_RC=0
 # Playwright image pinned by DIGEST, not just the mutable v1.61.1-jammy tag — see docker/e2e/c10-gate.sh
-# for the rationale; refresh the @sha256 whenever you bump the 1.48.0 pin (docker honours the digest and
+# for the rationale; refresh the @sha256 whenever you bump the 1.61.1 pin (docker honours the digest and
 # ignores the tag).
 ( cd "$(dirname "$0")/e2e" && docker run --rm --network host -v "$PWD:/e2e" -w /e2e \
     -e CONFLUENCE_BASE="${CONF_BASE}" \
