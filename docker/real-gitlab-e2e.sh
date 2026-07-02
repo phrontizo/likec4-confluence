@@ -198,13 +198,13 @@ echo "plugin /source  = $(curl -s -u "$CONF_AUTH" "${CONF_BASE}/rest/likec4/1.0/
 # below can never mask a failing render, and the result is reported unambiguously. Mirrors the rc-capture
 # discipline in perf/run.sh and zero-git-render.sh.
 SPEC_RC=0
-# Playwright image pinned by DIGEST, not just the mutable v1.48.0-jammy tag — see docker/e2e/c10-gate.sh
+# Playwright image pinned by DIGEST, not just the mutable v1.61.1-jammy tag — see docker/e2e/c10-gate.sh
 # for the rationale; refresh the @sha256 whenever you bump the 1.48.0 pin (docker honours the digest and
 # ignores the tag).
 ( cd "$(dirname "$0")/e2e" && docker run --rm --network host -v "$PWD:/e2e" -w /e2e \
     -e CONFLUENCE_BASE="${CONF_BASE}" \
     -e AUTH_USER="${CONF_AUTH%%:*}" -e AUTH_PASS="${CONF_AUTH#*:}" \
-    mcr.microsoft.com/playwright:v1.48.0-jammy@sha256:7dbbf924428aad5c87a5a3a5bc38f23e110cb1f5427fbbc7dbc3231014a4b0db \
+    mcr.microsoft.com/playwright:v1.61.1-jammy@sha256:7b86926fff94374389e8e1f4fdc5c76d050d4a06a7886bb537bf412b20e2b71e \
     sh -c 'if ! npm ci >/tmp/npm-install.log 2>&1; then echo "!! npm ci (against docker/e2e/package-lock.json) failed (offline, or a broken/partial install) — using the image-bundled runner; install-log tail:" >&2; tail -n 15 /tmp/npm-install.log >&2 || true; fi; npx playwright test gitlab-render.spec.ts --reporter=list' ) || SPEC_RC=$?
 if [ "$SPEC_RC" -ne 0 ]; then
   echo "FAIL: gitlab-render.spec.ts against real GitLab (rc=$SPEC_RC)" >&2
