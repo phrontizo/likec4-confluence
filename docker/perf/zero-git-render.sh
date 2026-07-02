@@ -29,10 +29,10 @@ BASE="${BASE:-$CONFLUENCE_BASE}"
 AUTH_PLAIN="${AUTH_PLAIN:-admin:admin}"
 MOCK="${MOCK:-http://localhost:8099}"
 PAGE_TITLE="${PAGE_TITLE:-LikeC4 Test Diagram}"
-# Pinned by DIGEST, not just the mutable v1.48.0-jammy tag — see docker/e2e/c10-gate.sh for the
-# rationale; refresh the @sha256 whenever you bump the 1.48.0 pin (docker honours the digest, ignores
+# Pinned by DIGEST, not just the mutable v1.61.1-jammy tag — see docker/e2e/c10-gate.sh for the
+# rationale; refresh the @sha256 whenever you bump the 1.61.1 pin (docker honours the digest, ignores
 # the tag). Overridable via PW_IMAGE for a local experiment.
-PW_IMAGE="${PW_IMAGE:-mcr.microsoft.com/playwright:v1.48.0-jammy@sha256:7dbbf924428aad5c87a5a3a5bc38f23e110cb1f5427fbbc7dbc3231014a4b0db}"
+PW_IMAGE="${PW_IMAGE:-mcr.microsoft.com/playwright:v1.61.1-jammy@sha256:7b86926fff94374389e8e1f4fdc5c76d050d4a06a7886bb537bf412b20e2b71e}"
 SPACE="${SPACE:-LIKEC4}"
 
 # Robust counter parse (mirrors run.sh's node parser): a missing/non-numeric/malformed/degraded body

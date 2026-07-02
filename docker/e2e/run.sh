@@ -70,11 +70,11 @@ fi
 # ${SPECS[*]} into the command string: each spec then reaches `playwright test` as its own quoted arg,
 # so a spec name with a space/metacharacter (possible via the "$@" override above) can't word-split or
 # be reinterpreted by the inner shell.
-# The Playwright image is pinned by DIGEST, not just the mutable v1.48.0-jammy tag — see c10-gate.sh for
-# the rationale. Refresh the @sha256 whenever you bump the 1.48.0 pin (docker honours the digest and
+# The Playwright image is pinned by DIGEST, not just the mutable v1.61.1-jammy tag — see c10-gate.sh for
+# the rationale. Refresh the @sha256 whenever you bump the 1.61.1 pin (docker honours the digest and
 # ignores the tag, so a stale digest would keep running the OLD image despite a new tag).
 docker run --rm --network host -v "$PWD:/e2e" -w /e2e \
   -e CONFLUENCE_BASE="$CONFLUENCE_BASE" \
   -e AUTH_USER="${AUTH%%:*}" -e AUTH_PASS="${AUTH#*:}" \
-  mcr.microsoft.com/playwright:v1.48.0-jammy@sha256:7dbbf924428aad5c87a5a3a5bc38f23e110cb1f5427fbbc7dbc3231014a4b0db \
-  sh -c 'if ! npm ci >/tmp/npm-install.log 2>&1; then echo "!! npm ci (against docker/e2e/package-lock.json) failed (offline, or a broken/partial install) — falling back to the image-bundled runner; install-log tail:" >&2; tail -n 15 /tmp/npm-install.log >&2 || true; fi; ver=$(npx playwright --version 2>/dev/null | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1); case "$ver" in 1.48.*) : ;; *) echo "!! Playwright runner is \"$ver\", expected 1.48.x — a partial install or image drift left an UNPINNED runner; refusing to run on it (runner<->browser must match the image tag)." >&2; exit 1 ;; esac; npx playwright test "$@"' sh "${SPECS[@]}"
+  mcr.microsoft.com/playwright:v1.61.1-jammy@sha256:7b86926fff94374389e8e1f4fdc5c76d050d4a06a7886bb537bf412b20e2b71e \
+  sh -c 'if ! npm ci >/tmp/npm-install.log 2>&1; then echo "!! npm ci (against docker/e2e/package-lock.json) failed (offline, or a broken/partial install) — falling back to the image-bundled runner; install-log tail:" >&2; tail -n 15 /tmp/npm-install.log >&2 || true; fi; ver=$(npx playwright --version 2>/dev/null | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1); case "$ver" in 1.61.*) : ;; *) echo "!! Playwright runner is \"$ver\", expected 1.61.x — a partial install or image drift left an UNPINNED runner; refusing to run on it (runner<->browser must match the image tag)." >&2; exit 1 ;; esac; npx playwright test "$@"' sh "${SPECS[@]}"

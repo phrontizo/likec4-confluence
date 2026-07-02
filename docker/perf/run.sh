@@ -30,7 +30,7 @@ AUTH_PLAIN="${AUTH_PLAIN:-admin:admin}"
 # GNU base64 wraps at 76 cols (\n) and some platforms can emit \r too — either would corrupt the header.
 AUTH="${AUTH:-$(printf '%s' "$AUTH_PLAIN" | base64 | tr -d '\n\r')}"
 MOCK="${MOCK:-http://localhost:8099}"
-# Pinned like every other harness image (Playwright v1.48.0-jammy, confluence 10.2.13, postgres:15,
+# Pinned like every other harness image (Playwright v1.61.1-jammy, confluence 10.2.13, postgres:15,
 # the mock's node:20-alpine@sha256): :latest drifts, and a breaking k6 release (e.g. another summary-
 # output change like the --summary-export one this script already works around) would silently break
 # the perf gate. 0.49.0 supports handleSummary() (the digest this script parses from STDOUT).

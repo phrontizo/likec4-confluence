@@ -19,10 +19,13 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <!-- Matches the version the Confluence 10.2.13 platform BOM manages (jackson is `provided` in the
-           wrapper, so this is the version actually present at runtime), so the standalone core tests
-           against the same jackson the shipped artifact runs on — same principle as commons-compress. -->
-      <version>2.21.3</version>
+      <!-- 2.21.4: one patch ahead of the 2.21.3 the Confluence 10.2.13 platform BOM manages, bumped to
+           clear the jackson-databind CVE cluster (GHSA-rmj7-2vxq-3g9f, -j3rv-43j4-c7qm, -hgj6-7826-r7m5,
+           -5hh8-q8hv-fr38, -9fxm-vc8v-hj55, -rcqc-6cw3-h962). Safe: jackson is `provided` in the wrapper,
+           so the DEPLOYED plugin still runs on the platform's jackson — this only patches the standalone
+           core + its tests, and 2.21.x is runtime forward-compatible. Stay on the 2.21.x line to remain
+           aligned with the platform minor; realign to the platform's exact patch when Confluence ships it. -->
+      <version>2.21.4</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
