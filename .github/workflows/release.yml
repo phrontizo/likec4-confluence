@@ -1,0 +1,142 @@
+name: Release
+
+# Cut a GitHub Release carrying the installable plugin JAR when a version tag is pushed.
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The tag drives the version: v0.1.0 builds a REAL (non-SNAPSHOT) plugin at 0.1.0 so UPM shows a
+# proper version and app upgrades work (atlassian-plugin.xml uses ${project.version}). A tag with a
+# pre-release suffix (e.g. v0.2.0-rc1) is published as a GitHub pre-release. Also runnable manually
+# via the Actions tab (workflow_dispatch) with an explicit version — handy for a dry run.
+#
+# NOT signed: the JAR is attached unsigned (see README "Install"). To also attach an Ed25519
+# signature, follow the OPTIONAL block below.
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build/release WITHOUT the leading v (e.g. 0.1.0). Creates tag v<version>.'
+        required: true
+
+concurrency:
+  # Serialise releases for a given ref; never cancel a release mid-flight.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # create the GitHub Release and upload the JAR asset
+
+jobs:
+  release:
+    name: Build + publish plugin JAR
+    runs-on: ubuntu-latest
+    # Same envelope as the CI plugin-build job: resolves the Confluence 10.2.13 tree + npm ci + Vite.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/main/frontend/package-lock.json
+
+      - name: Resolve release version + tag
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ github.event.inputs.version }}"
+            TAG="v${V}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            V="${TAG#v}"
+          fi
+          # Guard against an empty or whitespace-bearing version producing a junk artifact name.
+          case "$V" in
+            ""|*[[:space:]]*) echo "::error::Refusing to release bad version '$V' (tag '$TAG')"; exit 1 ;;
+          esac
+          {
+            echo "version=$V"
+            echo "tag=$TAG"
+            # A pre-release semver (has a '-' suffix, e.g. 0.2.0-rc1) => mark the GitHub Release pre-release.
+            if printf '%s' "$V" | grep -q '-'; then echo "prerelease=true"; else echo "prerelease=false"; fi
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG (version $V)"
+
+      # likec4-source-core is a standalone module (not a reactor child), so install it first. Its
+      # version is internal (it is bundled into the plugin) and deliberately stays SNAPSHOT — only
+      # the plugin POM below is stamped with the release version.
+      - name: Install likec4-core to the local Maven repo
+        run: ./mvnw -B -ntp -f likec4-core/pom.xml install -DskipTests
+
+      # Stamp the release version onto the plugin POM (root only; core is an external dep so its
+      # reference is untouched). This flows into the built JAR name and the plugin descriptor.
+      - name: Set plugin version from tag
+        run: ./mvnw -B -ntp versions:set -DnewVersion=${{ steps.ver.outputs.version }} -DgenerateBackupPoms=false
+
+      # Full build: runs the wrapper unit tests, builds the Vite frontend bundle, produces the JAR.
+      - name: Build plugin JAR
+        run: ./mvnw -B -ntp package
+
+      - name: Locate the plugin JAR
+        id: jar
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          # Mirror the CI/install-script glob: the plugin JAR only, never the -sources/-tests sidecars.
+          JAR=""
+          for f in target/likec4-confluence-*.jar; do
+            case "$f" in *-sources.jar|*-tests.jar) continue ;; esac
+            JAR="$f"; break
+          done
+          test -n "$JAR" || { echo "::error::plugin JAR not found under target/"; exit 1; }
+          echo "path=$JAR" >> "$GITHUB_OUTPUT"
+          echo "Built: $JAR"
+
+      # ---------------------------------------------------------------------------------------------
+      # OPTIONAL — attach a self-signed Ed25519 signature (for instances with UPM app-signing on).
+      # To enable:
+      #   1. Generate a key + cert once (see README "Install"): openssl genpkey -algorithm ed25519 ...
+      #   2. Add the PEM private key as the repo secret  APP_SIGNING_KEY  (Settings -> Secrets).
+      #   3. Uncomment the step below AND add  "${{ steps.jar.outputs.path }}.sig.pem"  to the
+      #      `gh release create` asset list in the next step.
+      #   (Publish your verification certificate out-of-band so admins can add it to their trust store.)
+      #
+      # - name: Sign the plugin JAR (Ed25519)
+      #   env:
+      #     APP_SIGNING_KEY: ${{ secrets.APP_SIGNING_KEY }}
+      #   run: |
+      #     set -euo pipefail
+      #     test -n "$APP_SIGNING_KEY" || { echo "::error::APP_SIGNING_KEY secret is not set"; exit 1; }
+      #     printf '%s' "$APP_SIGNING_KEY" > app-signing.key
+      #     openssl pkeyutl -sign -inkey app-signing.key -rawin \
+      #       -in "${{ steps.jar.outputs.path }}" -out app.sbin
+      #     openssl base64 -in app.sbin > "${{ steps.jar.outputs.path }}.sig.pem"
+      #     rm -f app-signing.key app.sbin
+      # ---------------------------------------------------------------------------------------------
+
+      - name: Create GitHub Release and upload the JAR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          args=(
+            "${{ steps.ver.outputs.tag }}"
+            "${{ steps.jar.outputs.path }}"
+            --repo "${{ github.repository }}"
+            --title "${{ steps.ver.outputs.tag }}"
+            --generate-notes
+          )
+          if [ "${{ steps.ver.outputs.prerelease }}" = "true" ]; then
+            args+=( --prerelease )
+          fi
+          # Creates the tag at this commit if it does not already exist (the workflow_dispatch path).
+          gh release create "${args[@]}"
