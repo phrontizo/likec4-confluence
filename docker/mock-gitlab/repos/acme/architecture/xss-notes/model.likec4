@@ -1,0 +1,13 @@
+model {
+  system sys {
+    title 'Notes System'
+    description 'plain system description'
+    container web 'Web App' {
+      // description is markdown-rendered by likec4 — a classic injection surface.
+      description '<img src=d onerror="window.__xss=1"> in the **description**'
+    }
+    container db 'Database'
+    // relationship title renders as an edge label in both the element and dynamic views.
+    web -> db 'reads <img src=r onerror="window.__xss=1">'
+  }
+}

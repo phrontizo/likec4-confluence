@@ -1,0 +1,16 @@
+model {
+  system sys {
+    // XSS-in-labels probe (spec §8 / item D1). These payloads MUST be rendered as
+    // inert, escaped text — never as live DOM. If the renderer injected them as HTML,
+    // the onerror/script would set window.__xss=1 (asserted falsy by xss.spec.ts).
+    title 'Sys <img src=x onerror="window.__xss=1">'
+    description '<script>window.__xss=1</script> plus <img src=y onerror="window.__xss=1"> in the description'
+    container web 'Web App'
+    container db 'Database'
+    web -> db 'reads/writes'
+  }
+  system ext {
+    title 'External System'
+  }
+  sys -> ext 'calls'
+}

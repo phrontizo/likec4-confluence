@@ -1,0 +1,6 @@
+# Keep the built image to just what the mock actually serves. The server's KEEP() filter only serves
+# .c4/.likec4/.likec4.snap under repos/, so the curated fixtures' provenance docs (NOTICE, PROVENANCE.md)
+# are dead weight baked into the image — exclude them from the build context rather than COPY'ing them in.
+# Cosmetic (image size only): the running stack is unaffected until the next `up -d --build`.
+**/*.md
+**/NOTICE

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
+  <plugin-info>
+    <description>${project.description}</description>
+    <version>${project.version}</version>
+    <vendor name="Phrontizo" url="https://phrontizo.com"/>
+    <param name="plugin-icon">images/pluginIcon.png</param>
+  </plugin-info>
+
+  <resource type="i18n" name="i18n" location="com/phrontizo/confluence/likec4/i18n"/>
+
+  <!-- Plugin-list icon, referenced by the <param name="plugin-icon">images/pluginIcon.png</param>
+       above. Declared as a download resource so it is routable at
+       /download/resources/<plugin-key>/images/pluginIcon.png for the UPM plugin list. NOTE: this does
+       NOT back a MACRO icon — the <xhtml-macro> below deliberately has no `icon` attribute (see its
+       comment), so the earlier "macro icon 404s without this" rationale no longer applies. -->
+  <resource type="download" name="images/pluginIcon.png" location="images/pluginIcon.png"/>
+
+  <!-- Browser bundle: the Vite build output (boot-loader.js + the ESM entry/chunks/worker/CSS under
+       likec4-web/), served as a downloadable directory; boot-loader.js reconstructs the absolute
+       asset URLs from the Vite manifest at runtime. -->
+  <web-resource key="likec4-web" name="LikeC4 Web Bundle">
+    <!-- The classic-script loader is injected as a <script> on the page; it then loads the ESM
+         bundle entry (likec4-web/assets/main.js) as <script type="module">. -->
+    <resource type="download" name="boot-loader.js" location="likec4-web/boot-loader.js"/>
+    <!-- The rest of the bundle (ESM entry, lazy chunks, the module worker, CSS) served as a
+         downloadable directory so the entry's relative imports + worker URL resolve. -->
+    <resource type="download" name="likec4-web/" location="likec4-web/"/>
+    <!-- No <context> here on purpose: the macro pulls this bundle in via an explicit
+         requireWebResource(...:likec4-web) in LikeC4DiagramMacro, which is the sole load path. A
+         <context>likec4</context> would be dead weight — nothing ever requires the "likec4" context
+         (the editor uses its own "editor"-context web-resource), so it could only ever double-load. -->
+  </web-resource>
+
+  <!-- Macro-editor "Load views" UX (spec §6). Loaded in the Confluence editor context so the macro
+       JS override is registered whenever a page is edited (before the author inserts the macro).
+       editor-loader.js is a classic <script> Confluence injects; it registers the Macro Browser JS
+       override for `likec4-diagram` and lazily injects the ESM editor bundle
+       (likec4-web/assets/editor-confluence.js) the first time the macro editor is opened. -->
+  <web-resource key="likec4-editor" name="LikeC4 Macro Editor">
+    <resource type="download" name="editor-loader.js" location="likec4-web/editor-loader.js"/>
+    <resource type="download" name="likec4-web/" location="likec4-web/"/>
+    <context>editor</context>
+  </web-resource>
+
+  <!-- No `icon` attribute: Confluence's editor macro-placeholder image renderer routes the macro
+       icon through an internal URL router that cannot resolve a plugin-relative `images/...` path
+       ("no route for images/pluginIcon.png" -> HTTP 500 on /placeholder/macro), which would make the
+       inserted placeholder a broken (zero-size) image. Falling back to the built-in default macro
+       icon keeps the placeholder routable + visible. -->
+  <xhtml-macro name="likec4-diagram" class="com.phrontizo.confluence.likec4.LikeC4DiagramMacro"
+               key="likec4-diagram-macro">
+    <description key="likec4.macro.desc"/>
+    <category name="visuals"/>
+    <parameters>
+      <parameter name="project" type="string" required="true"/>
+      <parameter name="ref" type="string"/>
+      <parameter name="path" type="string"/>
+      <parameter name="view" type="string"/>
+      <parameter name="instance" type="string"/>
+      <parameter name="height" type="string"/>
+    </parameters>
+  </xhtml-macro>
+
+  <!-- SAL service imports — makes PluginSettingsFactory and UserManager available
+       as named Spring beans so AdminConfig can receive them via constructor injection
+       without relying on the spring-scanner @ComponentImport mechanism. -->
+  <component-import key="pluginSettingsFactory"
+                    interface="com.atlassian.sal.api.pluginsettings.PluginSettingsFactory"/>
+  <component-import key="userManager"
+                    interface="com.atlassian.sal.api.user.UserManager"/>
+  <!-- Provides the Confluence (local) home directory (getLocalHomeDirectory(), with a
+       getSharedHomeDirectory() fallback) so AdminConfig can store the token-encryption key on the
+       filesystem, OFF PluginSettings/the DB (key-at-rest hardening). -->
+  <component-import key="applicationProperties"
+                    interface="com.atlassian.sal.api.ApplicationProperties"/>
+  <!-- WebSudo (Secure Administrator Sessions): the admin config page + REST require a re-authenticated
+       admin session. A no-op when the instance has Secure Admin Sessions disabled (Confluence default). -->
+  <component-import key="webSudoManager"
+                    interface="com.atlassian.sal.api.websudo.WebSudoManager"/>
+
+  <!-- Explicit Spring component declarations for the config/service beans.
+       Using <component> (not spring-scanner) guarantees the Spring context is created
+       and constructor-injected even when the spring-scanner runtime does not trigger
+       asynchronous context creation for external (non-bundled) plugins.  -->
+  <component key="adminConfig"
+             class="com.phrontizo.confluence.likec4.AdminConfig"
+             public="false"/>
+  <component key="sourceServiceProvider"
+             class="com.phrontizo.confluence.likec4.SourceServiceProvider"
+             public="false"/>
+
+  <rest key="likec4-rest" path="/likec4" version="1.0">
+    <description>LikeC4 source resolve/source + admin endpoints.</description>
+  </rest>
+
+  <web-item key="likec4-admin-link" name="LikeC4 Admin" section="system.admin/configuration" weight="200">
+    <label key="likec4.admin.label"/>
+    <link linkId="likec4-admin-link">/plugins/servlet/likec4/admin</link>
+  </web-item>
+
+  <servlet key="likec4-admin-servlet" name="LikeC4 Admin Servlet"
+           class="com.phrontizo.confluence.likec4.AdminServlet">
+    <url-pattern>/likec4/admin</url-pattern>
+  </servlet>
+</atlassian-plugin>

@@ -1,0 +1,71 @@
+LikeC4 Confluence Diagram Plugin
+Copyright (c) 2026 Phrontizo
+
+This product is licensed under the MIT License (see the LICENSE file).
+
+It bundles and/or builds upon third-party software that remains under its own
+license. The major components actually shipped in the plugin JAR or the browser
+bundle are listed below, grouped by where they ship. This list covers the
+direct/runtime dependencies; their transitive dependencies keep their own
+licenses too and are not enumerated exhaustively here.
+
+
+================================================================================
+Server side — bundled inside the plugin JAR (com.phrontizo.confluence:likec4-confluence)
+================================================================================
+
+  Apache Commons Compress (org.apache.commons:commons-compress 1.28.0)
+      Apache License 2.0
+      Used to extract the GitLab repository archive (tar.gz) server-side.
+
+The following server-side libraries are compile dependencies of the
+`likec4-source-core` module but are marked `provided` in the plugin POM — they
+are supplied by the Confluence platform at runtime and are NOT bundled in the
+plugin JAR:
+
+  Jackson (com.fasterxml.jackson.core: jackson-databind / jackson-core 2.21.3;
+      jackson-annotations 2.21) ............................. Apache License 2.0
+  Apache Commons IO / Codec / Lang3 ......................... Apache License 2.0
+
+
+================================================================================
+Browser bundle — built into src/main/resources/likec4-web/ and shipped in the JAR
+================================================================================
+
+  likec4 1.58.0 (and @likec4/core, @likec4/language-services 1.58.0)  ..... MIT
+      Parses/compiles the LikeC4 DSL, computes layouts, and renders diagrams.
+  React and React DOM 19.2.7 ............................................... MIT
+  @xyflow/react (React Flow) — bundled within the likec4 distribution ..... MIT
+  @mantine/* (UI primitives) — bundled within the likec4 distribution ..... MIT
+  D3 family (d3-zoom, d3-drag, d3-selection, …) — via @xyflow within
+      likec4 ................................................... ISC / BSD-3
+  @likec4/layouts 1.58.0 (graphviz-based layout engine) — via likec4 ...... MIT
+  @hpcc-js/wasm-graphviz 1.21.6 (WASM Graphviz) — via @likec4/layouts  Apache-2.0
+  Langium 3.5.0 — via @likec4/language-services ........................... MIT
+  Chevrotain 11.0.3 — via Langium ........................... Apache License 2.0
+  json5 2.2.3 ............................................................. MIT
+      Parses the .likec4.snap manual-layout snapshots (JSON5) in the bundle.
+
+
+================================================================================
+Bundled example architecture model (test fixture)
+================================================================================
+
+  docker/mock-gitlab/repos/acme/architecture/big/ is the LikeC4 project's
+  `examples/cloud-system` model, copied verbatim from
+  github.com/likec4/likec4 at tag v1.58.0.
+      Copyright (c) LikeC4 authors — MIT License.
+  See that directory's NOTICE / PROVENANCE.md for details.
+
+
+================================================================================
+Development / build / test-only tools (NOT shipped in the plugin)
+================================================================================
+
+  JUnit Jupiter (EPL-2.0), Vite / Vitest (MIT), Playwright (Apache-2.0),
+  TypeScript (Apache-2.0), tsx (MIT), the Atlassian Maven (amps) and
+  Spring-Scanner plugins (BSD / Apache-2.0). These run the build and tests only
+  and are not part of the distributed artifact.
+
+Full license texts are available in each dependency's own distribution / source
+repository.

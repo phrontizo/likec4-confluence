@@ -1,0 +1,16 @@
+Third-party example model — attribution
+=======================================
+
+The LikeC4 model in this directory (`big/`) is NOT original to this project.
+
+It is the LikeC4 project's `examples/cloud-system` model, copied verbatim from:
+
+    https://github.com/likec4/likec4   (tag v1.58.0, examples/cloud-system)
+
+    Copyright (c) LikeC4 authors
+    Licensed under the MIT License.
+
+It is bundled here only as a large, realistic test fixture served by the
+mock-GitLab harness. See PROVENANCE.md in this directory for exactly what was
+copied (and the two files that were omitted), and the repository-root NOTICE
+file for the project-wide third-party attribution list.

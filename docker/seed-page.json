@@ -1,0 +1,11 @@
+{
+  "type": "page",
+  "title": "LikeC4 Test Diagram",
+  "space": { "key": "LIKEC4" },
+  "body": {
+    "storage": {
+      "value": "<ac:structured-macro ac:name=\"likec4-diagram\"><ac:parameter ac:name=\"project\">acme/architecture</ac:parameter><ac:parameter ac:name=\"ref\">main2</ac:parameter><ac:parameter ac:name=\"path\">ok</ac:parameter><ac:parameter ac:name=\"view\">index</ac:parameter></ac:structured-macro>",
+      "representation": "storage"
+    }
+  }
+}

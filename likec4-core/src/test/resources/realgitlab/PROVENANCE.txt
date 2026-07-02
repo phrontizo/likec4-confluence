@@ -1,0 +1,58 @@
+REAL recorded gitlab.com API responses (design spec §14, residual 7)
+====================================================================
+
+These fixtures are GENUINE, byte-for-byte HTTP response bodies captured from the
+canonical public GitLab API at gitlab.com. gitlab.com runs the same GitLab code
+as a self-managed GitLab instance, so these REST + archive responses are
+byte-identical to what GitLabSourceClient will receive from an on-prem GitLab.
+
+Project : dslackw/colored
+URL     : https://gitlab.com/dslackw/colored
+Ref     : master  ->  pinned commit f3d799873a7cde62f3c43d74ed6ffc258240d956
+Recorded: 2026-06-28 (UTC) from gitlab.com, unauthenticated (public repo).
+
+Files
+-----
+commits.json    GET https://gitlab.com/api/v4/projects/dslackw%2Fcolored/repository/commits/master
+                -> the full real commit object (id, short_id, created_at,
+                   parent_ids, title, message, author_*, authored_date,
+                   committer_*, committed_date, web_url, stats, last_pipeline,
+                   trailers, extended_trailers, project_id, status, ...).
+                   Pinned id ("sha") = f3d799873a7cde62f3c43d74ed6ffc258240d956.
+
+archive.tar.gz  GET https://gitlab.com/api/v4/projects/dslackw%2Fcolored/repository/archive.tar.gz?sha=f3d799873a7cde62f3c43d74ed6ffc258240d956
+                -> the real GitLab git-archive: a real gzip+tar whose single top
+                   directory is "colored-<ref>-<sha>/" (here ref==sha, so
+                   "colored-f3d79987...-f3d79987.../"), holding 50 real blobs
+                   across nested dirs: colored/ (13), tests/ (12),
+                   tests_pytest/ (11), unittests/ (4) plus 10 root files
+                   (README.md, .gitlab-ci.yml, pyproject.toml, ...). 28,925 bytes.
+
+Honest scope (why a generic repo)
+---------------------------------
+The intent was a small public gitlab.com repo that actually contains LikeC4
+files (.c4/.likec4/.likec4.snap) so the §8 file-type FILTER is exercised on the
+keep side against real bytes. A genuine, exhaustive search of gitlab.com found
+NONE that are reachable unauthenticated:
+  - projects?search=  for likec4 / likec4-example / c4-model / c4 dsl /
+    model.likec4 / landscape.likec4 / diagrams-as-code / architecture-as-code /
+    structurizr / ...  (GitLab name-search does NOT index file contents)
+  - projects?topic=   likec4 (empty), c4 (3 hits), c4-model, c4model
+  - ~20 candidate repo trees probed recursively (tree?recursive=true) -> 0 .c4/.likec4
+  - the LikeC4 author's gitlab.com account (davydkov) -> no public projects
+  - group "likec4" -> 404
+  - GitLab /search?scope=blobs (the only content search) -> 401, requires a
+    logged-in token; none available at record time.
+LikeC4's ecosystem lives on GitHub, not gitlab.com.
+
+So this is the spec-sanctioned FALLBACK: a small, stable, generic public repo.
+Against these REAL bytes the contract test (GitLabRealContractTest) asserts:
+  - resolveSha parses the real commits JSON and extracts the pinned 40-hex id,
+    robustly despite all the surrounding real fields;
+  - the real archive.tar.gz extracts correctly: the real "<proj>-<sha>-<sha>/"
+    top dir is stripped and repo-relative nested paths are exact (whole repo and
+    a path= subtree), using the same gzip/tar + PathSafety as production;
+  - the §8 LikeC4 filter, run end-to-end through GitLabSourceClient, correctly
+    DROPS every one of the 50 real non-LikeC4 files (keep-set is empty for this
+    repo) -- the drop side is mutation-checked non-vacuous (50 real files dropped);
+  - the PRIVATE-TOKEN header and path= scoping travel on the real calls.

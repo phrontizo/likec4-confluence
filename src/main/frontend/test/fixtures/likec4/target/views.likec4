@@ -1,0 +1,10 @@
+views {
+  view index {
+    title 'Landscape'
+    include *
+  }
+  view sys_detail of sys {
+    title 'My System — detail'
+    include *
+  }
+}

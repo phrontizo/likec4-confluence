@@ -1,0 +1,18 @@
+# Keep the SHA-pinned GitHub Actions in .github/workflows/ current. The workflow pins each action to a
+# full commit SHA (supply-chain hardening against a hijacked mutable tag); without a bot those pins go
+# stale and miss the actions' own security/bug fixes. Dependabot opens PRs that bump the SHA (and the
+# trailing "# vX.Y.Z" comment) as new releases land — restoring "stay current" without giving up pinning.
+#
+# SCOPE — github-actions ONLY, deliberately. The maven and npm dependencies are HARD-pinned to versions
+# that MUST match the Confluence 10.2.13 platform (jackson 2.21.3, commons-compress 1.28.0) or the
+# likec4 toolchain (likec4 1.58.0 across @likec4/*, and the lodash-es override) — an automatic bump there
+# would break the build or silently drift off the platform BOM, so those bumps are made deliberately by a
+# human, not a bot (see CLAUDE.md "Critical gotchas"). The mock-gitlab base image is digest-pinned and
+# refreshed by hand when Node is bumped (see docker/mock-gitlab/Dockerfile). Re-add a maven/npm/docker
+# ecosystem here only if that hard-pinning policy changes.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

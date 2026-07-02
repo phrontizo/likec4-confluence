@@ -1,0 +1,104 @@
+name: likec4-confluence-test
+services:
+  postgres:
+    # Pin the default to a concrete minor (not the floating `postgres:15` head) so the disposable test
+    # DB is reproducible run-to-run, matching the pin discipline of the rest of the stack. Overridable
+    # via POSTGRES_IMAGE for a local experiment. Data lives in tmpfs (below) and is wiped each run, so
+    # there is no data-dir version-skew risk in bumping this.
+    image: ${POSTGRES_IMAGE:-postgres:15.18}
+    environment:
+      POSTGRES_DB: confluence
+      POSTGRES_USER: confluence
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-confluence}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U confluence"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # ephemeral; faster + lower disk for tests. Cap the size so an unexpected write burst can't consume
+    # host RAM and contend with Confluence's heap on the RAM-gated stack (manifesting as a hard-to-
+    # diagnose OOM sourced from tmpfs rather than the JVM). 1g is ample for the test DB's space + pages.
+    tmpfs: ["/var/lib/postgresql/data:size=1g"]
+
+  mockgitlab:
+    # The fixed `image:` tag is reused if it already exists, so a change to mock-gitlab/ (e.g. a new
+    # counter endpoint) is NOT picked up by a bare `docker compose up` — rebuild with `up -d --build`
+    # (which up.sh always does) after editing the mock, or the stack silently runs the old server.
+    image: likec4-mock-gitlab:dev
+    build: ./mock-gitlab
+    healthcheck:
+      # Hit the dedicated /__health liveness route (NOT a /repository/commits/ call): the latter runs
+      # every 5s and would inflate the mock's commitsCount, spuriously failing the perf/zero-git proofs
+      # that assert commits==0 / commits<=resolves after a /__reset.
+      # Probe with node's built-in http (the container's own runtime — it runs `node server.mjs`), NOT
+      # BusyBox `wget`: this healthcheck GATES Confluence startup (depends_on: service_healthy), so it must
+      # not rest on an Alpine userland tool that a future base-image change (slim/distroless) could drop —
+      # which would leave the mock permanently "unhealthy" and wedge the whole stack. node is guaranteed.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/__health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      # This healthcheck GATES Confluence startup (depends_on: service_healthy). Without a start_period a
+      # cold base-image start (or a slow badFixtures() validation) that overran ~50s (10x5s) would flip the
+      # mock to "unhealthy" and Confluence would never start — up.sh then burns its whole deadline blaming
+      # Confluence, not the mock. Give the mock a startup grace window, matching the generous windows
+      # postgres (20 retries) and confluence (start_period: 180s) already have — the mock was the outlier.
+      start_period: 15s
+
+  confluence:
+    image: ${CONFLUENCE_IMAGE:-atlassian/confluence:10.2.13}
+    depends_on:
+      postgres: { condition: service_healthy }
+      mockgitlab: { condition: service_healthy }
+    environment:
+      ATL_DB_TYPE: postgresql
+      ATL_DB_DRIVER: org.postgresql.Driver
+      ATL_JDBC_URL: jdbc:postgresql://postgres:5432/confluence
+      ATL_JDBC_USER: confluence
+      ATL_JDBC_PASSWORD: ${POSTGRES_PASSWORD:-confluence}
+      JVM_MINIMUM_MEMORY: ${JVM_MINIMUM_MEMORY:-1024m}
+      JVM_MAXIMUM_MEMORY: ${JVM_MAXIMUM_MEMORY:-2048m}
+      ATL_TOMCAT_PORT: "8090"
+      # Allow installing the plugin JAR via UPM file-upload. A freshly set-up Confluence DC rejects
+      # uploads with HTTP 403 "Plugins cannot be installed via upload" unless this property is true.
+      #
+      # Confluence 10.2 ships the atlassian-authentication-plugin, which BLOCKS HTTP Basic auth on
+      # API calls by DEFAULT for new installations (the upgrade-task back-fills block.requests=true)
+      # and also enables a 2SV-capable login mode that rejects raw /dologin.action form POSTs. The
+      # whole test harness (UPM install, /rest/likec4 calls, the Playwright specs) authenticates with
+      # HTTP Basic, so we force-allow it via the plugin's documented system property. This is the
+      # 10.2-equivalent of "Allow basic authentication on API calls" in Security Configuration.
+      #
+      # Confluence 10.2's UPM (universal-plugin-manager 8.0.17) enforces app SIGNATURE verification on
+      # uploaded JARs by default and rejects our unsigned dev build with "Signature check failed!".
+      # Disable the signature check so an unsigned local plugin JAR can be installed (dev/test only).
+      JVM_SUPPORT_RECOMMENDED_ARGS: >-
+        -Dupm.plugin.upload.enabled=true
+        -Dcom.atlassian.plugins.authentication.basic.auth.filter.force.allow=true
+        -Datlassian.upm.signature.check.disabled=true
+    # Bind to loopback by default. This test instance is deliberately permissive — admin/admin, WebSudo
+    # relaxed, HTTP Basic force-allowed, UPM signature check disabled (see JVM_SUPPORT_RECOMMENDED_ARGS) —
+    # so publishing it on 0.0.0.0 would expose an unusually open Confluence to the whole host network.
+    # 127.0.0.1 keeps it host-local (the e2e gate reaches it over `docker run --network host` +
+    # localhost, and up.sh polls localhost, so both still work; real-gitlab-e2e.sh binds loopback too).
+    # Set CONFLUENCE_BIND=0.0.0.0 to reach it from another machine on a trusted network.
+    ports:
+      - "${CONFLUENCE_BIND:-127.0.0.1}:${CONFLUENCE_PORT:-8090}:8090"
+    # Container cgroup hard limit. MUST stay comfortably above JVM_MAXIMUM_MEMORY: Confluence 10's
+    # non-heap footprint (metaspace, code cache, thread stacks, direct/mapped buffers) routinely adds
+    # ~700MB-1GB on top of the heap, so the default leaves the heap 2048m + ~1g headroom. Env-driven so
+    # that raising JVM_MAXIMUM_MEMORY in .env can be matched here (raising the heap alone would silently
+    # narrow this margin toward the OOM that up.sh's OOMKilled banner then reports). Keep >= heap + ~1.2g.
+    mem_limit: ${CONFLUENCE_MEM_LIMIT:-3g}
+    # INFORMATIONAL ONLY (for `docker compose ps`): nothing gates on this. up.sh and c10-gate.sh poll
+    # /status themselves with their own (longer, 1200s) readiness deadline, so a transient "unhealthy"
+    # here during a legitimately-still-booting instance does not block the gate. The probe uses `curl`,
+    # which ships in the atlassian/confluence:10.2.13 image; were a future base image to drop curl this
+    # would report a PERSISTENT (benign) "unhealthy" while the instance is fully RUNNING — the readiness
+    # polls above are authoritative, so treat a stuck "unhealthy" as a probe-tooling gap, not an outage.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8090/status"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 180s

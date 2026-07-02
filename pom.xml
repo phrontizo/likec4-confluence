@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.phrontizo.confluence</groupId>
+  <artifactId>likec4-confluence</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>atlassian-plugin</packaging>
+  <name>LikeC4 Confluence Diagram Plugin</name>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <properties>
+    <confluence.version>10.2.13</confluence.version>
+    <amps.version>9.12.5</amps.version>
+    <atlassian.spring.scanner.version>6.0.2</atlassian.spring.scanner.version>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <atlassian.plugin.key>${project.groupId}.${project.artifactId}</atlassian.plugin.key>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>atlassian-public</id>
+      <url>https://maven.artifacts.atlassian.com</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>atlassian-public</id>
+      <url>https://maven.artifacts.atlassian.com</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- JUnit BOM imported BEFORE the Confluence platform BOM so 5.14.4 wins. The platform pom otherwise
+           manages junit-jupiter-api/engine/params (and junit-platform-*) DOWN to 5.12.0, leaving only the
+           aggregator at the 5.14.4 we declare below — the wrapper's 123 tests would silently compile+run
+           against 5.12.0 while likec4-core runs 5.14.4. First-declared import wins, so this pins every
+           junit-* artifact to 5.14.4, matching likec4-core and the version we advertise. -->
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>5.14.4</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.atlassian.confluence</groupId>
+        <artifactId>confluence-plugins-platform-pom</artifactId>
+        <version>${confluence.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Mockito 5.23.0 ships byte-buddy + byte-buddy-agent as a matched pair, but the platform BOM bumps
+           byte-buddy to 1.17.8 and leaves the (unmanaged) agent at 1.17.7. Re-pair them at 1.17.8 so the
+           instrumentation core and its agent never version-skew (a known source of JDK-bump flakiness). -->
+      <dependency>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy-agent</artifactId>
+        <version>1.17.8</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- The plugin's own Atlassian-independent logic. This is the SOLE compile-scope (bundled)
+         dependency — it is deliberately packaged into the plugin JAR; every platform lib below is
+         `provided` (Confluence supplies it at runtime, so it must NOT be packaged). -->
+    <dependency>
+      <groupId>com.phrontizo.confluence</groupId>
+      <artifactId>likec4-source-core</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>com.atlassian.confluence</groupId>
+      <artifactId>confluence</artifactId>
+      <version>${confluence.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.atlassian.sal</groupId>
+      <artifactId>sal-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- Confluence 10 (Jakarta EE): JAX-RS is jakarta.ws.rs 3.1.0 (provided by Confluence). -->
+    <dependency>
+      <groupId>jakarta.ws.rs</groupId>
+      <artifactId>jakarta.ws.rs-api</artifactId>
+      <version>3.1.0</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- Servlet API for AdminServlet; Confluence 10 provides jakarta.servlet 6.0.0 at runtime. -->
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <version>6.0.0</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.atlassian.plugins</groupId>
+      <artifactId>atlassian-plugins-webresource</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.atlassian.plugin</groupId>
+      <artifactId>atlassian-spring-scanner-annotation</artifactId>
+      <version>${atlassian.spring.scanner.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.atlassian.plugin</groupId>
+      <artifactId>atlassian-spring-scanner-runtime</artifactId>
+      <version>${atlassian.spring.scanner.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- Confluence 10 (Jakarta EE): jakarta.inject 2.0.1 (provided by Confluence). -->
+    <dependency>
+      <groupId>jakarta.inject</groupId>
+      <artifactId>jakarta.inject-api</artifactId>
+      <version>2.0.1</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Platform libs that Confluence already bundles — they must NOT be packaged into the plugin JAR. -->
+    <!-- All reach THIS build transitively through likec4-source-core: jackson-databind is a DIRECT compile -->
+    <!-- dep of core (pinned to the platform's 2.21.3, used by its bundle-cache ObjectMapper), and -->
+    <!-- commons-codec/io/lang3 come via commons-compress 1.28.0 (which declares them as compile deps). The -->
+    <!-- confluence-maven-plugin's validate-banned-dependencies enforcer REJECTS any platform artifact -->
+    <!-- that reaches bundle scope, so declaring each provided (compile-time only, not packaged) is -->
+    <!-- load-bearing for `package` — removing any of them fails the banned-dependencies check. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Test-only: unit tests for the wrapper's authorization gates (REST resources / servlet). Version
+         is intentionally OMITTED — the junit-bom import above manages it (to 5.14.4) as the single source
+         of truth, so it can't drift from the platform-overridden junit-platform-* the BOM also pins. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>5.23.0</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- A JAX-RS runtime (RuntimeDelegate) so the resources can build jakarta.ws.rs Response objects
+         under plain JUnit; only jakarta.ws.rs-api (the API) is provided at compile time. Test-only.
+         This version is DELIBERATELY decoupled from whatever Jersey Confluence 10.2.13 ships at runtime:
+         the tests only exercise the stable JAX-RS 3.1.x Response/RuntimeDelegate API contract (never a
+         Jersey internal), so a mismatch with the platform's Jersey patch level is immaterial. Bump it
+         freely within 3.1.x; it is not managed by the Confluence platform BOM. -->
+    <dependency>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-common</artifactId>
+      <version>3.1.12</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Pin the compiler plugin (matching the version Maven 3.9.9's super-POM resolves today) so the
+           SHIPPED wrapper bytecode does not float with the ambient Maven distribution — same pinning
+           discipline as likec4-core/pom.xml (kept in lockstep at 3.13.0). Without this the root build
+           resolves maven-compiler-plugin via the super-POM's "latest compatible RELEASE" lookup, so the
+           deliverable module and likec4-core could silently compile with DIFFERENT compiler versions. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+      </plugin>
+      <!-- Pin surefire too (the version Maven 3.9.9's super-POM resolves today), so the 123 wrapper tests
+           run under the SAME surefire as likec4-core/pom.xml (which pins 3.5.6) rather than floating with
+           the ambient Maven/amps distribution. Same lockstep-reproducibility discipline as the compiler
+           pin above: without it the deliverable module and likec4-core could silently run their tests
+           under different surefire versions. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.6</version>
+      </plugin>
+      <plugin>
+        <groupId>com.atlassian.maven.plugins</groupId>
+        <artifactId>confluence-maven-plugin</artifactId>
+        <version>${amps.version}</version>
+        <extensions>true</extensions>
+        <configuration>
+          <productVersion>${confluence.version}</productVersion>
+          <enableQuickReload>true</enableQuickReload>
+          <compressResources>false</compressResources>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>com.atlassian.plugin</groupId>
+        <artifactId>atlassian-spring-scanner-maven-plugin</artifactId>
+        <version>${atlassian.spring.scanner.version}</version>
+        <executions>
+          <execution>
+            <id>atlassian-spring-scanner</id>
+            <phase>process-classes</phase>
+            <goals><goal>atlassian-spring-scanner</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.1</version>
+        <executions>
+          <execution>
+            <id>frontend-install</id>
+            <phase>generate-resources</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <executable>npm</executable>
+              <workingDirectory>${project.basedir}/src/main/frontend</workingDirectory>
+              <arguments><argument>ci</argument></arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>frontend-build</id>
+            <phase>generate-resources</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <executable>npm</executable>
+              <workingDirectory>${project.basedir}/src/main/frontend</workingDirectory>
+              <arguments><argument>run</argument><argument>build</argument></arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Bundle commons-compress (tar + gzip) INTO the plugin. Confluence 10.2.13 ships
+           commons-compress-1.28.0.jar in WEB-INF/lib but does NOT OSGi-export that package to P2
+           plugins, so amps treats it as product-provided and skips bundling it — leaving the archive
+           extractor's GzipCompressorInputStream / TarArchiveInputStream as a runtime NoClassDefFoundError
+           on any cache-miss fetch (masked for a long time by the persistent on-disk bundle cache; the
+           demo paths were cached, so only a fresh path exposed it). Unpack the (transitively-resolved,
+           1.28.0 — pinned to the platform's version, see likec4-core/pom.xml) commons-compress classes
+           into the plugin's output classes at prepare-package so they ship inside the JAR and the OSGi
+           bundle resolves them locally. `unpack-dependencies` uses the version Maven already resolved, so
+           there is no second place to keep in sync. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>bundle-commons-compress</id>
+            <phase>prepare-package</phase>
+            <goals><goal>unpack</goal></goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.commons</groupId>
+                  <artifactId>commons-compress</artifactId>
+                  <!-- Pinned to the platform's version (Confluence 10.2.13 WEB-INF/lib); the core pom
+                       pins the same 1.28.0 for the compile classpath. -->
+                  <version>1.28.0</version>
+                  <type>jar</type>
+                  <!-- overWrite so an amps dependency-marker for this same artifact can't short-circuit
+                       the unpack ("already exists in destination"). -->
+                  <overWrite>true</overWrite>
+                  <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                  <!-- Unpack ONLY the commons-compress package classes. An <excludes>META-INF/**</excludes>
+                       here is NOT honoured reliably by the unpack goal (the artifact's META-INF — its own
+                       NOTICE.txt/LICENSE.txt, the versions/9/module-info.class, and maven/ pom metadata —
+                       still leaked into the plugin classes and shipped in the JAR, mispresenting the
+                       artifact's attribution as the plugin's own and dropping stray module metadata). An
+                       explicit <includes> of just the class tree is deterministic: nothing under META-INF
+                       is selected, so none of it can leak. The plugin's own NOTICE/LICENSE are shipped
+                       into META-INF separately (see the maven-resources-plugin copy below). -->
+                  <includes>org/apache/commons/compress/**</includes>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Ship THIS plugin's own NOTICE + LICENSE into the JAR's META-INF. Previously the JAR carried
+           commons-compress's NOTICE.txt/LICENSE.txt (leaked by the unpack above) and NOT the project's
+           own, mispresenting the artifact's attribution. With that leak fixed (the unpack now selects
+           only class files), copy the real NOTICE/LICENSE in so the distributed artifact carries correct,
+           complete attribution for itself and every bundled dependency (the root NOTICE credits them). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.3.1</version>
+        <executions>
+          <execution>
+            <id>copy-notice-license</id>
+            <phase>prepare-package</phase>
+            <goals><goal>copy-resources</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.outputDirectory}/META-INF</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}</directory>
+                  <includes>
+                    <include>NOTICE</include>
+                    <include>LICENSE</include>
+                  </includes>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!--
+      ============================================================================
+      `postgres` profile — attempt to run `confluence:run` against an EXTERNAL
+      PostgreSQL DB instead of the default embedded H2.
+
+      Activate with:  mvn -Ppostgres confluence:run
+
+      The <dataSource> element + child names below are the EXACT ones bound by
+      com.atlassian.maven.plugins.amps.DataSource (confirmed from the amps
+      9.12.5 plugin descriptor / decompiled bean): url, driver, username,
+      password, libArtifacts/libArtifact(groupId/artifactId/version).
+
+      IMPORTANT — READ docker/README.md "External Postgres (residual R0)":
+      In amps this <dataSource> is consumed ONLY as a Cargo JNDI datasource
+      (system property `cargo.datasource.datasource`) and ONLY when a <jndi>
+      name is present; a direct-JDBC dataSource is filtered out. Even with a
+      <jndi> name, Confluence 8.0+ no longer reads its MAIN database from a
+      JNDI datasource — the main DB connection lives in the pre-baked
+      confluence-plugin-test-resources home (confluence.cfg.xml, H2) that the
+      run goal extracts, together with the auto-generated timebomb licence.
+      amps therefore CANNOT repoint Confluence's main DB (originally proven on
+      9.2.20, unchanged on the current 10.2.13 target) to Postgres. This profile
+      is retained as the documented, reproducible evidence of that wall (see
+      docker/README.md).
+      ============================================================================
+    -->
+    <profile>
+      <id>postgres</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.atlassian.maven.plugins</groupId>
+            <artifactId>confluence-maven-plugin</artifactId>
+            <version>${amps.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <productVersion>${confluence.version}</productVersion>
+              <enableQuickReload>true</enableQuickReload>
+              <compressResources>false</compressResources>
+              <!-- Direct-JDBC datasource pointed at the external compose Postgres. -->
+              <dataSource>
+                <url>jdbc:postgresql://localhost:5432/confluence</url>
+                <driver>org.postgresql.Driver</driver>
+                <username>confluence</username>
+                <password>confluence</password>
+                <libArtifacts>
+                  <libArtifact>
+                    <groupId>org.postgresql</groupId>
+                    <artifactId>postgresql</artifactId>
+                    <!-- Version is immaterial: this profile provably cannot repoint Confluence 10's main
+                         DB via this datasource (see the profile comment above) and the driver never ships
+                         in the plugin JAR. Don't waste time "updating" it — the profile is retained only
+                         as reproducible evidence of that platform wall. -->
+                    <version>42.7.3</version>
+                  </libArtifact>
+                </libArtifacts>
+              </dataSource>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

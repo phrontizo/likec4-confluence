@@ -1,0 +1,105 @@
+name: CI
+
+# Fast, deterministic checks for every push to the main line and every PR:
+#   - likec4-core JUnit suite (pure Java, no Confluence needed)
+#   - frontend typecheck + vitest (Node, no browser)
+#   - full plugin build: compiles the Jakarta wrapper against the real
+#     Confluence Data Center 10.2.13 APIs, runs the wrapper JUnit authz
+#     tests, and produces the deployable JAR
+#
+# NOT run here: the Docker/live end-to-end suite (real Confluence 10.2.13 +
+# Playwright, see docker/). It needs Docker, a timebomb licence and several GB
+# of RAM, so it is run manually — see docker/README.md.
+
+on:
+  push:
+    # Cover both branch-name conventions: this repo's default branch is `main` (the common GitHub
+    # convention); `master` is kept too so the mainline is never silently un-tested if it is ever
+    # renamed. (PRs fire regardless of base branch below.)
+    branches: [ main, master ]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: likec4-core (JUnit)
+    runs-on: ubuntu-latest
+    # Cap the runtime: this job only compiles+tests pure Java, so a run that outlives this is a
+    # hung Maven download, not slow work. Without a cap a stall burns up to GitHub's 360-minute
+    # default before it is killed, with no signal about what hung.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'   # Confluence 10 runs on / is built against Java 21
+          cache: maven
+      - name: Test likec4-core
+        run: ./mvnw -B -ntp -f likec4-core/pom.xml test
+
+  frontend:
+    name: frontend (typecheck + vitest)
+    runs-on: ubuntu-latest
+    # npm ci + tsc + vitest on Node, no browser — a run past this is a wedged npm install, not work.
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/main/frontend
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/main/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  plugin-build:
+    name: plugin JAR (compiles against Confluence 10.2.13)
+    runs-on: ubuntu-latest
+    # The heaviest job: resolves the whole Confluence 10.2.13 dependency tree from the public
+    # Atlassian repo, plus npm ci + the Vite build. A registry stall here is the most likely hang,
+    # so cap it well above a healthy run (~10 min cold cache) but far below the 360-minute default.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: src/main/frontend/package-lock.json
+      # The root plugin build depends on likec4-source-core being in the local
+      # repo, so install it first (it is a standalone module, not a reactor child).
+      - name: Install likec4-core to the local Maven repo
+        run: ./mvnw -B -ntp -f likec4-core/pom.xml install -DskipTests
+      # package compiles the Jakarta wrapper against the Confluence 10.2.13
+      # dependency tree (resolved from the public Atlassian repo, no creds),
+      # runs the wrapper JUnit authz tests (JUnit 5 + Mockito) and the Vite
+      # frontend build, producing the plugin JAR.
+      - name: Build plugin JAR (incl. wrapper unit tests)
+        run: ./mvnw -B -ntp package
+      - name: Upload plugin JAR
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: likec4-confluence-plugin
+          # Exactly the plugin JAR — mirror the install scripts' strict glob and exclude the
+          # -sources/-tests sidecars so a consumer of this artifact can't pick the wrong JAR.
+          path: |
+            target/likec4-confluence-*.jar
+            !target/likec4-confluence-*-sources.jar
+            !target/likec4-confluence-*-tests.jar
+          if-no-files-found: error

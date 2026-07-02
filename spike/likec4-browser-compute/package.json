@@ -1,0 +1,32 @@
+{
+  "name": "likec4-browser-compute-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:node": "vitest run",
+    "make-snapshot": "tsx scripts/make-snapshot.ts",
+    "build": "vite build",
+    "preview": "vite preview --port 4317 --strictPort",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@likec4/core": "1.58.0",
+    "@likec4/language-services": "1.58.0",
+    "elkjs": "0.9.3",
+    "json5": "2.2.3",
+    "likec4": "1.58.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.48.0",
+    "@types/node": "^22.19.20",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "@vitejs/plugin-react": "4.3.3",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vite": "5.4.10",
+    "vitest": "2.1.4"
+  }
+}
