@@ -1,0 +1,16 @@
+# OVERLAY ONLY — must be layered AFTER compose.yaml so it inherits the project name + the mockgitlab
+# service definition (image, build, healthcheck):
+#   docker compose -f compose.yaml -f compose.mock-publish.yaml up
+# Invoked alone it would start a bare, nameless mock with none of that config. It exists solely to
+# publish the mock-GitLab port to the host so the perf/zero-git harness (which defaults to
+# MOCK=http://localhost:8099) can reach the counter endpoints (/__count, /__reset) against the
+# canonical compose stack — compose.yaml deliberately does not publish it (a normal gate run reaches
+# the mock only over the compose network). The mock listens on container port 8080 (non-root).
+services:
+  mockgitlab:
+    ports:
+      # Bind to 127.0.0.1 only — the perf/zero-git harness reaches it via localhost:8099, so loopback
+      # suffices, and this mirrors compose.yaml's Confluence bind rather than exposing the fixture
+      # server (and its /__reset counter-clear endpoint) to the whole host network. Prefix with a
+      # different host IP here only if you deliberately need off-box access.
+      - "127.0.0.1:8099:8080"

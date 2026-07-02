@@ -1,0 +1,16 @@
+model {
+  system sys {
+    title 'My System'
+    container web 'Web App'
+    container db 'Database'
+    web -> db 'reads/writes'
+  }
+  system ext {
+    title 'External System'
+  }
+  system mon {
+    title 'Monitoring'
+  }
+  sys -> ext 'calls'
+  sys -> mon 'reports to'
+}

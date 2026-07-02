@@ -1,0 +1,12 @@
+# OVERLAY ONLY — must be layered AFTER compose.yaml so it inherits the project name + the postgres
+# service definition (image, env, tmpfs):
+#   docker compose -f compose.yaml -f compose.pg-publish.yaml up
+# Invoked alone it would start a bare, nameless Postgres with none of that config. It exists solely to
+# publish 5432 to the host (e.g. to inspect the DB) without editing compose.yaml.
+services:
+  postgres:
+    ports:
+      # Bind to 127.0.0.1 only — local DB inspection reaches it via localhost:5432, and this mirrors
+      # compose.yaml's Confluence bind rather than exposing Postgres to the whole host network. Prefix
+      # with a different host IP here only if you deliberately need off-box access.
+      - "127.0.0.1:5432:5432"

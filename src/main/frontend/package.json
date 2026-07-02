@@ -1,0 +1,42 @@
+{
+  "name": "likec4-confluence-frontend",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20 <21"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "make-snapshot": "tsx test/scripts/make-snapshot.ts",
+    "build": "vite build",
+    "preview": "vite preview --port 4317 --strictPort",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@likec4/core": "1.58.0",
+    "@likec4/language-services": "1.58.0",
+    "json5": "2.2.3",
+    "likec4": "1.58.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.48.0",
+    "@types/node": "20.19.43",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "4.7.0",
+    "fake-indexeddb": "6.2.5",
+    "jsdom": "29.1.1",
+    "tsx": "4.22.4",
+    "typescript": "5.9.3",
+    "vite": "5.4.21",
+    "vitest": "3.2.6"
+  },
+  "comment:overrides": "lodash-es is deliberately forced to 4.18.x (NOT the canonical 4.17.21 line) to clear a high-severity advisory pulled in transitively via langium/chevrotain. Do NOT 'correct' it back to 4.17.21 — that reopens the advisory. See the npm-audit gotcha in CLAUDE.md.",
+  "overrides": {
+    "lodash-es": "^4.18.1"
+  }
+}

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.phrontizo.confluence</groupId>
+  <artifactId>likec4-source-core</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>LikeC4 Source Core</name>
+  <description>Atlassian-independent GitLab source fetch, caching, token crypto, and validation.</description>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <!-- Matches the version the Confluence 10.2.13 platform BOM manages (jackson is `provided` in the
+           wrapper, so this is the version actually present at runtime), so the standalone core tests
+           against the same jackson the shipped artifact runs on — same principle as commons-compress. -->
+      <version>2.21.3</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+      <!-- Matches the version the Confluence 10.2.13 platform BOM manages (and therefore the version
+           actually bundled into the plugin JAR), so the standalone core and the shipped artifact agree. -->
+      <version>1.28.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <!-- Keep in lockstep with the version the root wrapper build advertises (its junit-bom import) —
+           same "the standalone core tests on the version the shipped build uses" discipline as the
+           jackson/commons-compress pins above. This is a standalone module (no parent), so the version is
+           explicit here rather than BOM-managed. -->
+      <version>5.14.4</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Pin the compiler plugin too (matching the version Maven 3.9.9's super-POM resolves today), so
+           a reproducible build does not float with the ambient Maven distribution — same pinning
+           discipline as surefire/jackson/commons-compress/junit above. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.6</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>

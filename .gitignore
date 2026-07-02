@@ -1,0 +1,30 @@
+# Agent / session working dirs (Claude Code, Claire) — local-only, never tracked.
+.claude/
+.claire/
+# Agent loop transcripts/logs — transient, never tracked.
+claude-loop.log
+iter-*.txt
+iter-*.jsonl
+iter-*.err
+
+# OS / editor cruft
+.DS_Store
+*.swp
+
+node_modules/
+src/main/resources/likec4-web/
+test-results/
+target/
+likec4-core/target/
+docker/.env
+# Timebomb DC licence for the local e2e stack — a real Atlassian licence; never commit it.
+# (The docs at README.md / docker/README.md / CLAUDE.md all promise this path is gitignored.)
+docker/.timebomb-license
+docker/*.timebomb-license
+docker/e2e/node_modules/
+docker/e2e/render*.png
+# Transient e2e evidence screenshots (admin-chrome.png is committed as the item-10 deliverable).
+docker/e2e/xss-notes-walkthrough.png
+docker/e2e/admin-form.png
+docker/e2e/macro-native-rendered.png
+docker/perf/summary.json

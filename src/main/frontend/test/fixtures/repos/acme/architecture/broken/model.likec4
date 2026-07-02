@@ -1,0 +1,6 @@
+model {
+  system sys {
+    container web 'Web App'
+    web -> nonexistent 'broken relation'
+  }
+}
