@@ -1,6 +1,6 @@
 {
   "comment": "Pinned EXACT to match the digest-pinned mcr.microsoft.com/playwright:v1.48.0-jammy@sha256 container image used by c10-gate.sh / run.sh (the test runner and the browsers it drives must agree); a floating ^ could drift to a runner the image's browsers don't match. This lockfile is the single source of truth for the in-container install: the scripts run `npm ci` against it (see the sh -c line), so bump the pin HERE when moving off 1.48.0 and refresh the scripts' image @sha256 to match.",
   "devDependencies": {
-    "@playwright/test": "1.48.0"
+    "@playwright/test": "1.61.1"
   }
 }
