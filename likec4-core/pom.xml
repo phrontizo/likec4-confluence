@@ -25,7 +25,7 @@
            so the DEPLOYED plugin still runs on the platform's jackson — this only patches the standalone
            core + its tests, and 2.21.x is runtime forward-compatible. Stay on the 2.21.x line to remain
            aligned with the platform minor; realign to the platform's exact patch when Confluence ships it. -->
-      <version>2.21.4</version>
+      <version>2.21.5</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
