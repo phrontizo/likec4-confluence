@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@likec4/core": "1.58.0",
-    "@likec4/language-services": "1.58.0",
+    "@likec4/language-services": "1.59.2",
     "json5": "2.2.3",
-    "likec4": "1.58.0",
+    "likec4": "1.59.2",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
@@ -32,7 +32,7 @@
     "jsdom": "29.1.1",
     "tsx": "4.22.4",
     "typescript": "5.9.3",
-    "vite": "6.4.3",
+    "vite": "8.2.0",
     "vitest": "3.2.6"
   },
   "comment:overrides": "lodash-es is deliberately forced to 4.18.x (NOT the canonical 4.17.21 line) to clear a high-severity advisory pulled in transitively via langium/chevrotain. Do NOT 'correct' it back to 4.17.21 — that reopens the advisory. See the npm-audit gotcha in CLAUDE.md.",
